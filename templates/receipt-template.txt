@@ -1,0 +1,18 @@
+[LOGO]
+
+XYZ FOUNDATION
+
+Receipt No: {{receipt_id}}
+Date: {{date}}
+
+Received from:
+{{name}}
+
+Address:
+{{address}}
+
+Amount: {{currency_symbol}}{{amount}}
+Currency: {{currency}}
+
+Payment Mode: {{payment_mode}}
+Reference: {{reference}}

@@ -1,47 +1,3 @@
-function initialSetup() {
-
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-
-  // Create Google Form
-  const form = FormApp.create('Donation Form');
-
-  form.addTextItem().setTitle('Full Name');
-  form.addTextItem().setTitle('Email').setRequired(true);
-  form.addTextItem().setTitle('Phone Number');
-  form.addParagraphTextItem().setTitle('Address');
-  form.addTextItem().setTitle('Donation Amount');
-
-  const currencyItem = form.addMultipleChoiceItem();
-  currencyItem.setTitle('Currency');
-  currencyItem.setChoices([
-    currencyItem.createChoice('INR'),
-    currencyItem.createChoice('USD')
-  ]);
-
-  const paymentItem = form.addMultipleChoiceItem();
-  paymentItem.setTitle('Payment Mode');
-  paymentItem.setChoices([
-    paymentItem.createChoice('UPI'),
-    paymentItem.createChoice('Bank Transfer'),
-    paymentItem.createChoice('Cash')
-  ]);
-
-  form.addTextItem().setTitle('Transaction Reference');
-
-  // Link Form to Sheet
-  form.setDestination(FormApp.DestinationType.SPREADSHEET, SpreadsheetApp.getActiveSpreadsheet().getId());
-
-  // Store Form Link
-  sheet.getRange("D1").setValue("Form Link:");
-  sheet.getRange("D2").setValue(form.getPublishedUrl());
-
-  try {
-    SpreadsheetApp.getUi().alert("✅ Setup complete! Form created.");
-  } catch (e) {
-    Logger.log("Setup complete!");
-  }
-}
-
 function onFormSubmit(e) {
 
   if (!e) {
@@ -53,45 +9,35 @@ function onFormSubmit(e) {
   const row = e.range.getRow();
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
 
-  const timestamp = data[0];
-  const name = data[1];
-  const email = data[2];
-  const address = data[4];
-  const amount = parseFloat(data[5]);
-  const currency = data[6];
-  const paymentMode = data[7];
-  const reference = data[8];
+  const responses = e.namedValues;
 
+  const name = responses["Full Name"][0];
+  const email = responses["Email"][0];
+  const address = responses["Address"][0];
+  const timestamp = responses["Timestamp"][0];
+  const amount = responses["Donation Amount"][0];
   const receiptId = generateReceiptId(sheet);
 
-  sheet.getRange(row, 9).setValue(receiptId);
-
-  const conversion = convertToINR(amount, currency);
-  sheet.getRange(row, 11).setValue(conversion.convertedAmount);
-  sheet.getRange(row, 12).setValue(conversion.exchangeRate);
-
-  const symbol = getCurrencySymbol(currency);
-
+  const receiptCol = getColumnIndexByName(sheet, "Receipt Name");
+  sheet.getRange(row, receiptCol).setValue(receiptId);
+  
   const pdfFile = createPDF({
     receiptId,
     date: timestamp,
     name,
     address,
-    amount,
-    currency,
-    currencySymbol: symbol,
-    paymentMode,
-    reference
+    amount
   });
 
-  sheet.getRange(row, 10).setValue(pdfFile.getUrl());
+  const pdfCol = getColumnIndexByName(sheet, "Receipt PDF");
+  sheet.getRange(row, pdfCol).setValue(pdfFile.getUrl());
 
   MailApp.sendEmail({
     to: email,
     subject: "Donation Receipt - " + receiptId,
     htmlBody: `
       Dear ${name},<br><br>
-      Thank you for your donation.<br><br>
+      Thank you for your donation of ${amount}.<br><br>
       Please find your receipt attached.<br><br>
       Regards,<br>
       NGO Team
@@ -101,11 +47,13 @@ function onFormSubmit(e) {
 }
 
 function generateReceiptId(sheet) {
-  const year = sheet.getRange("B1").getValue();
-  const counterCell = sheet.getRange("B2");
+  const year = new Date().getFullYear();
 
-  let lastNumber = counterCell.getValue();
-  if (!lastNumber) lastNumber = 0;
+  const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Config");
+  const counterCell = configSheet.getRange("A1");
+
+  let lastNumber = parseInt(counterCell.getValue(), 10);
+  if (isNaN(lastNumber)) lastNumber = 0;
 
   const newNumber = lastNumber + 1;
   counterCell.setValue(newNumber);
@@ -115,32 +63,19 @@ function generateReceiptId(sheet) {
   return `RCPT-${year}-${formatted}`;
 }
 
-function convertToINR(amount, currency) {
-  const rates = {
-    "USD": 83,
-    "INR": 1
-  };
-
-  const rate = rates[currency] || 1;
-
-  return {
-    convertedAmount: amount * rate,
-    exchangeRate: rate
-  };
-}
-
-function getCurrencySymbol(currency) {
-  if (currency.includes("INR")) return "₹";
-  if (currency.includes("USD")) return "$";
-  return "";
-}
-
 function createPDF(data) {
   const templateId = "15q5eBB5NQ2nzodwD7mc-FTXhBJHJRciAl-Jpt8yfnhw";
-  const folderId = "1e15e_pJlwYjdkJIZrAnUxVCXM9rZqUVH";
+  const folderId = "1lquqwuZEnFeaomuapyhJ14Ujz6sSYGLe"
 
+  const folder = DriveApp.getFolderById(folderId);
   const templateFile = DriveApp.getFileById(templateId);
-  const copy = templateFile.makeCopy("Receipt-" + data.receiptId);
+
+    // Create copy directly in folder
+  const copy = templateFile.makeCopy("Receipt-" + data.receiptId, folder);
+
+  // IMPORTANT: slight delay to ensure file availability
+  Utilities.sleep(15000);
+
   const doc = DocumentApp.openById(copy.getId());
   const body = doc.getBody();
 
@@ -149,19 +84,26 @@ function createPDF(data) {
   body.replaceText("{{name}}", data.name);
   body.replaceText("{{address}}", data.address);
   body.replaceText("{{amount}}", data.amount);
-  body.replaceText("{{currency}}", data.currency);
-  body.replaceText("{{currency_symbol}}", data.currencySymbol);
-  body.replaceText("{{payment_mode}}", data.paymentMode || "-");
-  body.replaceText("{{reference}}", data.reference || "-");
 
   doc.saveAndClose();
 
-  const pdf = DriveApp.getFileById(copy.getId()).getAs("application/pdf");
-  const folder = DriveApp.getFolderById(folderId);
-  const pdfFile = folder.createFile(pdf);
+  const pdfBlob = copy.getAs("application/pdf");
+  const pdfFile = folder.createFile(pdfBlob).setName(data.receiptId + ".pdf");
 
-  DriveApp.getFileById(copy.getId()).setTrashed(true);
+  // Cleanup
+  copy.setTrashed(true);
 
   return pdfFile;
 }
 
+function getColumnIndexByName(sheet, columnName) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  for (let i = 0; i < headers.length; i++) {
+    if (headers[i] === columnName) {
+      return i + 1; // 1-based index
+    }
+  }
+
+  throw new Error("Column not found: " + columnName);
+}

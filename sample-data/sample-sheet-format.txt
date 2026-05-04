@@ -1,0 +1,1 @@
+Timestamp | Name | Email | Phone | Address | Amount | Currency | Payment Mode | Reference | Receipt ID | PDF Link | Converted INR | Exchange Rate

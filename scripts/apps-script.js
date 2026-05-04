@@ -1,4 +1,54 @@
+function initialSetup() {
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+
+  // Create Google Form
+  const form = FormApp.create('Donation Form');
+
+  form.addTextItem().setTitle('Full Name');
+  form.addTextItem().setTitle('Email').setRequired(true);
+  form.addTextItem().setTitle('Phone Number');
+  form.addParagraphTextItem().setTitle('Address');
+  form.addTextItem().setTitle('Donation Amount');
+
+  const currencyItem = form.addMultipleChoiceItem();
+  currencyItem.setTitle('Currency');
+  currencyItem.setChoices([
+    currencyItem.createChoice('INR'),
+    currencyItem.createChoice('USD')
+  ]);
+
+  const paymentItem = form.addMultipleChoiceItem();
+  paymentItem.setTitle('Payment Mode');
+  paymentItem.setChoices([
+    paymentItem.createChoice('UPI'),
+    paymentItem.createChoice('Bank Transfer'),
+    paymentItem.createChoice('Cash')
+  ]);
+
+  form.addTextItem().setTitle('Transaction Reference');
+
+  // Link Form to Sheet
+  form.setDestination(FormApp.DestinationType.SPREADSHEET, SpreadsheetApp.getActiveSpreadsheet().getId());
+
+  // Store Form Link
+  sheet.getRange("D1").setValue("Form Link:");
+  sheet.getRange("D2").setValue(form.getPublishedUrl());
+
+  try {
+    SpreadsheetApp.getUi().alert("✅ Setup complete! Form created.");
+  } catch (e) {
+    Logger.log("Setup complete!");
+  }
+}
+
 function onFormSubmit(e) {
+
+  if (!e) {
+    Logger.log("No event object. Run via form submission.");
+    return;
+  }
+
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const row = e.range.getRow();
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -86,8 +136,8 @@ function getCurrencySymbol(currency) {
 }
 
 function createPDF(data) {
-  const templateId = "PASTE_TEMPLATE_ID";
-  const folderId = "PASTE_FOLDER_ID";
+  const templateId = "15q5eBB5NQ2nzodwD7mc-FTXhBJHJRciAl-Jpt8yfnhw";
+  const folderId = "1e15e_pJlwYjdkJIZrAnUxVCXM9rZqUVH";
 
   const templateFile = DriveApp.getFileById(templateId);
   const copy = templateFile.makeCopy("Receipt-" + data.receiptId);
@@ -114,3 +164,4 @@ function createPDF(data) {
 
   return pdfFile;
 }
+

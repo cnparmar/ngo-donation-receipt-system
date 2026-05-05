@@ -12,10 +12,10 @@ function onFormSubmit(e) {
   const responses = e.namedValues;
 
   const name = responses["Full Name"][0];
-  const email = responses["Email"][0];
+  const email = responses["Email Id"][0];
   const address = responses["Address"][0];
   const timestamp = responses["Timestamp"][0];
-  const amount = responses["Donation Amount"][0];
+  const amount = responses["Donation Amount (in USD)"][0];
   const receiptId = generateReceiptId(sheet);
 
   const receiptCol = getColumnIndexByName(sheet, "Receipt Name");
@@ -29,7 +29,7 @@ function onFormSubmit(e) {
     amount
   });
 
-  const pdfCol = getColumnIndexByName(sheet, "Receipt PDF");
+  const pdfCol = getColumnIndexByName(sheet, "Receipt Location");
   sheet.getRange(row, pdfCol).setValue(pdfFile.getUrl());
 
   MailApp.sendEmail({
@@ -37,7 +37,7 @@ function onFormSubmit(e) {
     subject: "Donation Receipt - " + receiptId,
     htmlBody: `
       Dear ${name},<br><br>
-      Thank you for your donation of ${amount}.<br><br>
+      Thank you for your donation of USD ${amount}.<br><br>
       Please find your receipt attached.<br><br>
       Regards,<br>
       NGO Team
@@ -64,8 +64,8 @@ function generateReceiptId(sheet) {
 }
 
 function createPDF(data) {
-  const templateId = "15q5eBB5NQ2nzodwD7mc-FTXhBJHJRciAl-Jpt8yfnhw";
-  const folderId = "1lquqwuZEnFeaomuapyhJ14Ujz6sSYGLe"
+  const templateId = "1SUglBtMS23UE9TdzMZfd-DGFDVG5-IpqpbNWaoaVPQ0";
+  const folderId = "1aE6VuVl39R5IBe-JsWZuVi_RBNBvNnUs"
 
   const folder = DriveApp.getFolderById(folderId);
   const templateFile = DriveApp.getFileById(templateId);
@@ -74,7 +74,7 @@ function createPDF(data) {
   const copy = templateFile.makeCopy("Receipt-" + data.receiptId, folder);
 
   // IMPORTANT: slight delay to ensure file availability
-  Utilities.sleep(15000);
+  Utilities.sleep(10000);
 
   const doc = DocumentApp.openById(copy.getId());
   const body = doc.getBody();
